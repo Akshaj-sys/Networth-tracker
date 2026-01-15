@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#007bff">
+    <meta name="description" content="A simple offline-capable personal finance tracker">
+    <title>Personal Finance Tracker</title>
+    <link rel="manifest" href="./manifest.json">
+    <link rel="apple-touch-icon" href="./icon-192.png">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #f5f5f5;
+        }
+        h1 { margin-bottom: 20px; color: #333; }
+        h2 { margin: 20px 0 10px; color: #555; border-bottom: 2px solid #ddd; padding-bottom: 5px; }
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .card { background: white; padding: 20px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h3 { font-size: 14px; color: #777; margin-bottom: 10px; }
+        .card .value { font-size: 24px; font-weight: bold; color: #333; }
+        .section { background: white; padding: 20px; margin-bottom: 20px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: 500; color: #555; }
+        input, select, textarea { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 3px; font-size: 14px; }
+        textarea { resize: vertical; min-height: 60px; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 3px; cursor: pointer; font-size: 14px; margin-right: 10px; margin-bottom: 10px; }
+        button:hover { background: #0056b3; }
+        button.secondary { background: #6c757d; }
+        button.secondary:hover { background: #545b62; }
+        button.danger { background: #dc3545; }
+        button.danger:hover { background: #c82333; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #f8f9fa; font-weight: 600; color: #555; }
+        .actions { white-space: nowrap; }
+        .actions button { padding: 5px 10px; font-size: 12px; margin: 0 2px; }
+        .export-section { background: #fff3cd; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+        .export-section h3 { margin-bottom: 10px; color: #856404; }
+        .file-input { margin: 10px 0; }
+        .hidden { display: none; }
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+            .dashboard { grid-template-columns: 1fr; }
+            table { font-size: 12px; }
+            th, td { padding: 5px; }
+        }
+    </style>
+</head>
+<body>
+    <h1>💰 Personal Finance Tracker</h1>
+    
+    <div class="dashboard">
+        <div class="card">
+            <h3>Monthly Expenses</h3>
+            <div class="value" id="monthlyExpenses">₹0.00</div>
+        </div>
+        <div class="card">
+            <h3>Total Assets</h3>
+            <div class="value" id="totalAssets">₹0.00</div>
+        </div>
+        <div class="card">
+            <h3>Total Liabilities</h3>
+            <div class="value" id="totalLiabilities">₹0.00</div>
+        </div>
+        <div class="card">
+            <h3>Net Worth</h3>
+            <div class="value" id="netWorth">₹0.00</div>
+        </div>
+    </div>
+
+    <div class="export-section">
+        <h3>📁 Data Export & Import</h3>
+        <div>
+            <button onclick="exportExpenses()">Export Expenses CSV</button>
+            <button onclick="exportAssets()">Export Assets CSV</button>
+            <button onclick="exportLiabilities()">Export Liabilities CSV</button>
+            <button onclick="exportAll()" class="secondary">Export All Data</button>
+        </div>
+        <div class="file-input">
+            <label>Import from CSV:</label>
+            <input type="file" id="importFile" accept=".csv">
+            <button onclick="importCSV()">Import Selected File</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Expenses</h2>
+        <div class="form-group">
+            <label>Date</label>
+            <input type="date" id="expenseDate">
+        </div>
+        <div class="form-group">
+            <label>Category</label>
+            <select id="expenseCategory">
+                <option>Food</option>
+                <option>Transport</option>
+                <option>Housing</option>
+                <option>Utilities</option>
+                <option>Entertainment</option>
+                <option>Healthcare</option>
+                <option>Shopping</option>
+                <option>Other</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Amount</label>
+            <input type="number" id="expenseAmount" step="0.01" placeholder="0.00">
+        </div>
+        <div class="form-group">
+            <label>Note</label>
+            <textarea id="expenseNote" placeholder="Optional note..."></textarea>
+        </div>
+        <button onclick="addExpense()">Add Expense</button>
+        <button onclick="cancelExpenseEdit()" class="secondary hidden" id="cancelExpenseBtn">Cancel</button>
+        
+        <table id="expensesTable">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Category</th>
+                    <th>Amount</th>
+                    <th>Note</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="expensesBody"></tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>Assets</h2>
+        <div class="form-group">
+            <label>Name</label>
+            <input type="text" id="assetName" placeholder="e.g., Savings Account">
+        </div>
+        <div class="form-group">
+            <label>Type</label>
+            <select id="assetType">
+                <option>Cash</option>
+                <option>Savings</option>
+                <option>Investment</option>
+                <option>Property</option>
+                <option>Vehicle</option>
+                <option>Other</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Value</label>
+            <input type="number" id="assetValue" step="0.01" placeholder="0.00">
+        </div>
+        <button onclick="addAsset()">Add Asset</button>
+        <button onclick="cancelAssetEdit()" class="secondary hidden" id="cancelAssetBtn">Cancel</button>
+        
+        <table id="assetsTable">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Value</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="assetsBody"></tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>Liabilities</h2>
+        <div class="form-group">
+            <label>Name</label>
+            <input type="text" id="liabilityName" placeholder="e.g., Credit Card">
+        </div>
+        <div class="form-group">
+            <label>Type</label>
+            <select id="liabilityType">
+                <option>Credit Card</option>
+                <option>Loan</option>
+                <option>Mortgage</option>
+                <option>Other</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Amount</label>
+            <input type="number" id="liabilityAmount" step="0.01" placeholder="0.00">
+        </div>
+        <button onclick="addLiability()">Add Liability</button>
+        <button onclick="cancelLiabilityEdit()" class="secondary hidden" id="cancelLiabilityBtn">Cancel</button>
+        
+        <table id="liabilitiesTable">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Amount</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="liabilitiesBody"></tbody>
+        </table>
+    </div>
+
+    <script>
+        // --- SERVICE WORKER REGISTRATION ---
+        if ("serviceWorker" in navigator) {
+            // Use ./sw.js to support GitHub Pages subdirectories
+            navigator.serviceWorker.register("./sw.js")
+                .then(() => console.log("Service Worker Registered"))
+                .catch(err => console.error("Service Worker Failed:", err));
+        }
+
+        // --- APP LOGIC ---
+        let expenses = JSON.parse(localStorage.getItem('expenses') || '[]');
+        let assets = JSON.parse(localStorage.getItem('assets') || '[]');
+        let liabilities = JSON.parse(localStorage.getItem('liabilities') || '[]');
+        let editingExpenseId = null;
+        let editingAssetId = null;
+        let editingLiabilityId = null;
+
+        // Initialize date input
+        if(document.getElementById('expenseDate')) {
+            document.getElementById('expenseDate').valueAsDate = new Date();
+        }
+
+        // Helper: Format Currency (Matched to HTML ₹)
+        function formatCurrency(amount) {
+            return '₹' + parseFloat(amount).toFixed(2);
+        }
+
+        function generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2);
+        }
+
+        // --- EXPENSES ---
+        function addExpense() {
+            const date = document.getElementById('expenseDate').value;
+            const category = document.getElementById('expenseCategory').value;
+            const amount = document.getElementById('expenseAmount').value;
+            const note = document.getElementById('expenseNote').value;
+
+            if (!date || !amount) {
+                alert('Please fill in date and amount');
+                return;
+            }
+
+            if (editingExpenseId) {
+                const index = expenses.findIndex(e => e.id === editingExpenseId);
+                if (index !== -1) {
+                    expenses[index] = { id: editingExpenseId, date, category, amount: parseFloat(amount), note };
+                }
+                editingExpenseId = null;
+                document.getElementById('cancelExpenseBtn').classList.add('hidden');
+            } else {
+                expenses.push({ id: generateId(), date, category, amount: parseFloat(amount), note });
+            }
+
+            localStorage.setItem('expenses', JSON.stringify(expenses));
+            clearExpenseForm();
+            renderExpenses();
+            updateDashboard();
+        }
+
+        function editExpense(id) {
+            const expense = expenses.find(e => e.id === id);
+            if (!expense) return;
+            document.getElementById('expenseDate').value = expense.date;
+            document.getElementById('expenseCategory').value = expense.category;
+            document.getElementById('expenseAmount').value = expense.amount;
+            document.getElementById('expenseNote').value = expense.note;
+            editingExpenseId = id;
+            document.getElementById('cancelExpenseBtn').classList.remove('hidden');
+        }
+
+        function deleteExpense(id) {
+            if (!confirm('Delete this expense?')) return;
+            expenses = expenses.filter(e => e.id !== id);
+            localStorage.setItem('expenses', JSON.stringify(expenses));
+            renderExpenses();
+            updateDashboard();
+        }
+
+        function cancelExpenseEdit() {
+            editingExpenseId = null;
+            clearExpenseForm();
+            document.getElementById('cancelExpenseBtn').classList.add('hidden');
+        }
+
+        function clearExpenseForm() {
+            document.getElementById('expenseDate').valueAsDate = new Date();
+            document.getElementById('expenseCategory').selectedIndex = 0;
+            document.getElementById('expenseAmount').value = '';
+            document.getElementById('expenseNote').value = '';
+        }
+
+        function renderExpenses() {
+            const tbody = document.getElementById('expensesBody');
+            tbody.innerHTML = '';
+            const sorted = [...expenses].sort((a, b) => new Date(b.date) - new Date(a.date));
+            sorted.forEach(expense => {
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td>${expense.date}</td>
+                    <td>${expense.category}</td>
+                    <td>${formatCurrency(expense.amount)}</td>
+                    <td>${expense.note}</td>
+                    <td class="actions">
+                        <button onclick="editExpense('${expense.id}')">Edit</button>
+                        <button onclick="deleteExpense('${expense.id}')" class="danger">Delete</button>
+                    </td>`;
+            });
+        }
+
+        // --- ASSETS ---
+        function addAsset() {
+            const name = document.getElementById('assetName').value;
+            const type = document.getElementById('assetType').value;
+            const value = document.getElementById('assetValue').value;
+
+            if (!name || !value) {
+                alert('Please fill in name and value');
+                return;
+            }
+
+            if (editingAssetId) {
+                const index = assets.findIndex(a => a.id === editingAssetId);
+                if (index !== -1) assets[index] = { id: editingAssetId, name, type, value: parseFloat(value) };
+                editingAssetId = null;
+                document.getElementById('cancelAssetBtn').classList.add('hidden');
+            } else {
+                assets.push({ id: generateId(), name, type, value: parseFloat(value) });
+            }
+
+            localStorage.setItem('assets', JSON.stringify(assets));
+            clearAssetForm();
+            renderAssets();
+            updateDashboard();
+        }
+
+        function editAsset(id) {
+            const asset = assets.find(a => a.id === id);
+            if (!asset) return;
+            document.getElementById('assetName').value = asset.name;
+            document.getElementById('assetType').value = asset.type;
+            document.getElementById('assetValue').value = asset.value;
+            editingAssetId = id;
+            document.getElementById('cancelAssetBtn').classList.remove('hidden');
+        }
+
+        function deleteAsset(id) {
+            if (!confirm('Delete this asset?')) return;
+            assets = assets.filter(a => a.id !== id);
+            localStorage.setItem('assets', JSON.stringify(assets));
+            renderAssets();
+            updateDashboard();
+        }
+
+        function cancelAssetEdit() {
+            editingAssetId = null;
+            clearAssetForm();
+            document.getElementById('cancelAssetBtn').classList.add('hidden');
+        }
+
+        function clearAssetForm() {
+            document.getElementById('assetName').value = '';
+            document.getElementById('assetType').selectedIndex = 0;
+            document.getElementById('assetValue').value = '';
+        }
+
+        function renderAssets() {
+            const tbody = document.getElementById('assetsBody');
+            tbody.innerHTML = '';
+            assets.forEach(asset => {
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td>${asset.name}</td>
+                    <td>${asset.type}</td>
+                    <td>${formatCurrency(asset.value)}</td>
+                    <td class="actions">
+                        <button onclick="editAsset('${asset.id}')">Edit</button>
+                        <button onclick="deleteAsset('${asset.id}')" class="danger">Delete</button>
+                    </td>`;
+            });
+        }
+
+        // --- LIABILITIES ---
+        function addLiability() {
+            const name = document.getElementById('liabilityName').value;
+            const type = document.getElementById('liabilityType').value;
+            const amount = document.getElementById('liabilityAmount').value;
+
+            if (!name || !amount) {
+                alert('Please fill in name and amount');
+                return;
+            }
+
+            if (editingLiabilityId) {
+                const index = liabilities.findIndex(l => l.id === editingLiabilityId);
+                if (index !== -1) liabilities[index] = { id: editingLiabilityId, name, type, amount: parseFloat(amount) };
+                editingLiabilityId = null;
+                document.getElementById('cancelLiabilityBtn').classList.add('hidden');
+            } else {
+                liabilities.push({ id: generateId(), name, type, amount: parseFloat(amount) });
+            }
+
+            localStorage.setItem('liabilities', JSON.stringify(liabilities));
+            clearLiabilityForm();
+            renderLiabilities();
+            updateDashboard();
+        }
+
+        function editLiability(id) {
+            const liability = liabilities.find(l => l.id === id);
+            if (!liability) return;
+            document.getElementById('liabilityName').value = liability.name;
+            document.getElementById('liabilityType').value = liability.type;
+            document.getElementById('liabilityAmount').value = liability.amount;
+            editingLiabilityId = id;
+            document.getElementById('cancelLiabilityBtn').classList.remove('hidden');
+        }
+
+        function deleteLiability(id) {
+            if (!confirm('Delete this liability?')) return;
+            liabilities = liabilities.filter(l => l.id !== id);
+            localStorage.setItem('liabilities', JSON.stringify(liabilities));
+            renderLiabilities();
+            updateDashboard();
+        }
+
+        function cancelLiabilityEdit() {
+            editingLiabilityId = null;
+            clearLiabilityForm();
+            document.getElementById('cancelLiabilityBtn').classList.add('hidden');
+        }
+
+        function clearLiabilityForm() {
+            document.getElementById('liabilityName').value = '';
+            document.getElementById('liabilityType').selectedIndex = 0;
+            document.getElementById('liabilityAmount').value = '';
+        }
+
+        function renderLiabilities() {
+            const tbody = document.getElementById('liabilitiesBody');
+            tbody.innerHTML = '';
+            liabilities.forEach(liability => {
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td>${liability.name}</td>
+                    <td>${liability.type}</td>
+                    <td>${formatCurrency(liability.amount)}</td>
+                    <td class="actions">
+                        <button onclick="editLiability('${liability.id}')">Edit</button>
+                        <button onclick="deleteLiability('${liability.id}')" class="danger">Delete</button>
+                    </td>`;
+            });
+        }
+
+        // --- DASHBOARD ---
+        function updateDashboard() {
+            const now = new Date();
+            const currentMonth = now.getMonth();
+            const currentYear = now.getFullYear();
+            
+            const monthlyExpenses = expenses
+                .filter(e => {
+                    const expenseDate = new Date(e.date);
+                    return expenseDate.getMonth() === currentMonth && expenseDate.getFullYear() === currentYear;
+                })
+                .reduce((sum, e) => sum + e.amount, 0);
+
+            const totalAssets = assets.reduce((sum, a) => sum + a.value, 0);
+            const totalLiabilities = liabilities.reduce((sum, l) => sum + l.amount, 0);
+            const netWorth = totalAssets - totalLiabilities;
+
+            document.getElementById('monthlyExpenses').textContent = formatCurrency(monthlyExpenses);
+            document.getElementById('totalAssets').textContent = formatCurrency(totalAssets);
+            document.getElementById('totalLiabilities').textContent = formatCurrency(totalLiabilities);
+            document.getElementById('netWorth').textContent = formatCurrency(netWorth);
+        }
+
+        // --- EXPORT/IMPORT ---
+        function arrayToCSV(data, headers) {
+            if (data.length === 0) return headers.join(',');
+            const rows = [headers.join(',')];
+            data.forEach(item => {
+                const values = headers.map(header => {
+                    const key = header.toLowerCase();
+                    let value = item[key] || '';
+                    if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
+                        value = '"' + value.replace(/"/g, '""') + '"';
+                    }
+                    return value;
+                });
+                rows.push(values.join(','));
+            });
+            return rows.join('\n');
+        }
+
+        function downloadCSV(content, filename) {
+            const blob = new Blob([content], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function exportExpenses() { downloadCSV(arrayToCSV(expenses, ['id', 'date', 'category', 'amount', 'note']), 'expenses.csv'); }
+        function exportAssets() { downloadCSV(arrayToCSV(assets, ['id', 'name', 'type', 'value']), 'assets.csv'); }
+        function exportLiabilities() { downloadCSV(arrayToCSV(liabilities, ['id', 'name', 'type', 'amount']), 'liabilities.csv'); }
+
+        function exportAll() {
+            exportExpenses();
+            setTimeout(exportAssets, 100);
+            setTimeout(exportLiabilities, 200);
+        }
+
+        function importCSV() {
+            const fileInput = document.getElementById('importFile');
+            const file = fileInput.files[0];
+            if (!file) { alert('Please select a file'); return; }
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const content = e.target.result;
+                const lines = content.split('\n').filter(line => line.trim());
+                if (lines.length < 2) { alert('Invalid CSV file'); return; }
+                const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+                const data = [];
+                for (let i = 1; i < lines.length; i++) {
+                    const values = parseCSVLine(lines[i]);
+                    const obj = {};
+                    headers.forEach((header, index) => { obj[header] = values[index] || ''; });
+                    data.push(obj);
+                }
+                
+                if (headers.includes('category') && headers.includes('date')) {
+                    expenses = data.map(d => ({ id: d.id || generateId(), date: d.date, category: d.category, amount: parseFloat(d.amount) || 0, note: d.note || '' }));
+                    localStorage.setItem('expenses', JSON.stringify(expenses));
+                    renderExpenses();
+                    alert('Expenses imported successfully');
+                } else if (headers.includes('value')) {
+                    assets = data.map(d => ({ id: d.id || generateId(), name: d.name, type: d.type, value: parseFloat(d.value) || 0 }));
+                    localStorage.setItem('assets', JSON.stringify(assets));
+                    renderAssets();
+                    alert('Assets imported successfully');
+                } else if (headers.includes('amount')) {
+                    liabilities = data.map(d => ({ id: d.id || generateId(), name: d.name, type: d.type, amount: parseFloat(d.amount) || 0 }));
+                    localStorage.setItem('liabilities', JSON.stringify(liabilities));
+                    renderLiabilities();
+                    alert('Liabilities imported successfully');
+                }
+                updateDashboard();
+                fileInput.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        function parseCSVLine(line) {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                if (char === '"') {
+                    if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+                    else { inQuotes = !inQuotes; }
+                } else if (char === ',' && !inQuotes) { result.push(current.trim()); current = ''; }
+                else { current += char; }
+            }
+            result.push(current.trim());
+            return result;
+        }
+
+        // Initial render
+        renderExpenses();
+        renderAssets();
+        renderLiabilities();
+        updateDashboard();
+    </script>
+</body>
+</html>
